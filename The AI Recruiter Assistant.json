@@ -1,0 +1,264 @@
+{
+  "name": "The AI Recruiter Assistant",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "pdf",
+        "binaryPropertyName": "data0",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        448,
+        0
+      ],
+      "id": "5ff682a3-38e6-48d6-8066-7371d38ac742",
+      "name": "Extract from File"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4O-MINI"
+        },
+        "responses": {
+          "values": [
+            {
+              "content": "=### ROLE\nYou are a senior technical recruiter.\n\n### JOB DESCRIPTION\n{{ $('When chat message received').item.json.chatInput }}\n### CANDIDATE RESUME\n{{ $json.text }}\n\n### TASK\n1. Compare the Resume against the Job Description above.\n2. Calculate a match score.\n3. Identify specific changes the candidate could make to improve their score for THIS specific JD.\n\n\n  ### OUTPUT FORMAT (STRICT JSON)\n{\n  \"candidate_name\": \"Name\",\n  \"candidate_email\": \"Extract email from resume\",\n  \"match_score\": 0,\n  \"missing_skills\": [\"List\", \"Of\", \"Skills\"],\n  \"improvement_feedback\": \"Constructive feedback on why they were rejected.\",\n  \"interview_recommendation\": true\n}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ],
+      "id": "da898c4e-abf5-4977-90c6-997dc599bcf6",
+      "name": "Message a model",
+      "credentials": {
+        "openAiApi": {
+          "id": "Ipbuag2zk7Ha64Lc",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Get the input data\nconst inputData = $input.first().json;\n\n// 2. Dig for the text based on your specific error log\n// Path: output -> Item 0 -> content -> Item 0 -> text\nlet rawText = \"\";\n\nif (inputData.output && inputData.output[0] && inputData.output[0].content && inputData.output[0].content[0]) {\n    rawText = inputData.output[0].content[0].text;\n} \n// Fallback checks just in case\nelse {\n    rawText = inputData.message?.content || inputData.text || inputData.content;\n}\n\n// 3. Safety Check\nif (!rawText) {\n    return [{ json: { error: \"Could not find text\", debug: inputData } }];\n}\n\n// 4. Clean the text\n// Your log shows the text starts with \"json\\n\", so we remove \"json\" and backticks\nconst cleanJson = rawText\n    .replace(/^json\\s*/, \"\") // Removes the word \"json\" at the start\n    .replace(/```json/g, \"\") // Removes markdown\n    .replace(/```/g, \"\")\n    .trim();\n\n// 5. Parse and Return\ntry {\n    const parsedData = JSON.parse(cleanJson);\n    return [{ json: parsedData }];\n} catch (e) {\n    return [{ json: { error: \"Parsing failed\", raw_text: rawText } }];\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1024,
+        0
+      ],
+      "id": "ad7cf9cd-8493-47bb-9f97-8f8f7ca761f8",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "e722836c-a95e-4453-88b4-e0da734e6741",
+              "leftValue": "={{ $json.match_score }}",
+              "rightValue": 70,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1248,
+        0
+      ],
+      "id": "431fd449-24a9-4824-8774-1ffd93292e6d",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "sendTo": "=nithya.shree0916@gmail.com",
+        "subject": "=Interview Invitation:{{ $('Code in JavaScript').item.json.candidate_name }}",
+        "message": "=Hi {{ $('Code in JavaScript').item.json.candidate_name }},\nThanks for applying. We are happy to invite you in the next step of the interview process. Please let me know your availability!\n\nThanks,\nRecruiting team",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1472,
+        -96
+      ],
+      "id": "47067b48-a332-4ad7-80a0-5e0bdf259d36",
+      "name": "Send a message",
+      "webhookId": "a8543338-d97e-4ee4-ad43-a5ac293945ca",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "u45trfGv0C635eIO",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "public": true,
+        "options": {
+          "allowFileUploads": true
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        224,
+        0
+      ],
+      "id": "3a62f22b-a51b-47a0-9d12-562b15cdb71f",
+      "name": "When chat message received",
+      "webhookId": "7e277f1e-2125-4677-ab5a-4f6640440485"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $('Code in JavaScript').item.json.output }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1472,
+        96
+      ],
+      "id": "601b1946-699d-4787-94ac-8c70a3953579",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.candidate_email }}",
+        "subject": "Update on your application",
+        "message": "=<p>Hi <b>{{ $json.candidate_name }}</b>,</p>\n\n<p>Thank you for giving us the opportunity to review your application. After careful consideration, we have decided not to move forward with your candidacy for this specific role.</p>\n\n<p>However, our automated review team generated some specific feedback that might help you with future applications:</p>\n\n<div style=\"background-color: #f9f9f9; border-left: 4px solid #d0d0d0; padding: 10px; margin: 10px 0;\">\n    <b>💡 Feedback for Improvement:</b><br>\n    {{ $json.improvement_feedback }}\n</div>\n\n<p>We appreciate your time and wish you the best of luck in your job search.</p>\n\n<p>Best regards,<br>\n<b>The Hiring Team</b></p>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1680,
+        96
+      ],
+      "id": "bf5a64e4-d920-42ca-991a-dc769a477c8f",
+      "name": "Send a message1",
+      "webhookId": "7bfa4a62-dddb-4d00-84f2-38d8a210ac9a",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "u45trfGv0C635eIO",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond to Webhook": {
+      "main": [
+        [
+          {
+            "node": "Send a message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "9715bc70-aac1-4f8e-a704-a78ca8e50eb0",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "8d12c6d28c1a1cc539e9a3465b34c2843fc90e168bc9fb5c24bf3b66d6a872f2"
+  },
+  "id": "jtAaSd9CSJjUcxVp",
+  "tags": []
+}
